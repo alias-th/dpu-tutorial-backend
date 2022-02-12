@@ -1,21 +1,13 @@
-# build stage
-FROM node:lts-alpine as build-stage
-WORKDIR /app
-COPY ./entrypoint.sh /entrypoint.sh
-COPY package*.json ./
-RUN npm install
+FROM golang:1.17-alpine
+WORKDIR /go/src/github.com/tarathep/tutorial-backend/
+RUN go get -d -v github.com/gin-gonic/gin
+RUN go get -d -v github.com/stretchr/testify
+RUN go get -d -v go.mongodb.org/mongo-driver
 COPY . .
-RUN npm run build
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app .
 
-# production stage
-FROM nginx:stable-alpine as production-stage
-COPY --from=build-stage /app/dist /usr/share/nginx/html
-COPY --from=build-stage /app/entrypoint.sh /usr/share/nginx/html
-
-EXPOSE 80
-
-COPY ./entrypoint.sh /entrypoint.sh
-
-# Grant Linux permissions and run entrypoint script
-RUN chmod +x /entrypoint.sh
-ENTRYPOINT ["/entrypoint.sh"]
+FROM alpine:latest  
+RUN apk --no-cache add ca-certificates
+WORKDIR /root/
+COPY --from=0 /go/src/github.com/tarathep/tutorial-backend/app ./
+CMD ["./app"]
